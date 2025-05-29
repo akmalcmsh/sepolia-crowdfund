@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crowdfunding DApp</title>
+    <script src="https://cdn.jsdelivr.net/npm/ethers@5/dist/ethers.umd.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+
+        .container {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        h1,
+        h2 {
+            color: #2c3e50;
+        }
+
+        .campaign-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .info-item {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            border-left: 4px solid #3498db;
+        }
+
+        .info-item h3 {
+            margin-top: 0;
+            font-size: 0.9em;
+            color: #7f8c8d;
+        }
+
+        .info-item p {
+            margin-bottom: 0;
+            font-size: 1.2em;
+            font-weight: bold;
+        }
+
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #2980b9;
+        }
+
+        button:disabled {
+            background-color: #bdc3c7;
+            cursor: not-allowed;
+        }
+
+        input {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin-right: 10px;
+            width: 150px;
+        }
+
+        .action-section {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+        }
+
+        .status {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 5px;
+        }
+
+        .status.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, .3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .wallet-section {
+            margin-bottom: 20px;
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Crowdfunding DApp</h1>
+
+        <div class="wallet-section">
+            <h2>Wallet Connection</h2>
+            <div id="wallet-status">Not connected</div>
+            <button id="connect-wallet">Connect MetaMask</button>
+        </div>
+    </div>
+
+    <div class="container hidden" id="campaign-container">
+        <h2>Campaign Details</h2>
+
+        <div class="campaign-info">
+            <div class="info-item">
+                <h3>Goal</h3>
+                <p id="goal">0 ETH</p>
+            </div>
+            <div class="info-item">
+                <h3>Raised</h3>
+                <p id="raised">0 ETH</p>
+            </div>
+            <div class="info-item">
+                <h3>Time Remaining</h3>
+                <p id="time-remaining">0 days, 0 hours</p>
+            </div>
+            <div class="info-item">
+                <h3>Contributors</h3>
+                <p id="contributor-count">0</p>
+            </div>
+            <div class="info-item">
+                <h3>Goal Reached</h3>
+                <p id="goal-reached">No</p>
+            </div>
+            <div class="info-item">
+                <h3>Your Contribution</h3>
+                <p id="your-contribution">0 ETH</p>
+            </div>
+        </div>
+
+        <div class="action-section">
+            <h2>Contribute</h2>
+            <p>Minimum contribution: 0.01 ETH</p>
+            <input type="number" id="contribution-amount" placeholder="Amount in ETH" step="0.01" min="0.01">
+            <button id="contribute-btn">Contribute</button>
+        </div>
+
+        <div class="action-section">
+            <h2>Owner Actions</h2>
+            <button id="withdraw-btn" disabled>Withdraw Funds</button>
+            <p id="owner-status" class="hidden">You are the campaign owner</p>
+        </div>
+
+        <div class="action-section">
+            <h2>Contributor Actions</h2>
+            <button id="refund-btn" disabled>Request Refund</button>
+        </div>
+
+        <div id="status-message" class="status hidden"></div>
+    </div>
+
+    <script>
+        // Contract ABI (will be replaced with actual ABI after compilation)
+        const contractABI = [
+            {
+                "anonymous": false,
+                "inputs": [
+                    {
+                        "indexed": false,
+                        "internalType": "address",
+                        "name": "contributor",
+                        "type": "address"
+                    },
+                    {
+                        "indexed": false,
+                        "internalType": "uint256",
+                        "name": "amount",
+                        "type": "uint256"
+                    }
+                ],
+                "name": "FundReceived",
+                "type": "event"
+            },
+            {
+                "anonymous": false,
+                "inputs": [
+                    {
+                        "indexed": false,
+                        "internalType": "uint256",
+                        "name": "totalAmount",
+                        "type": "uint256"
+                    }
+                ],
+                "name": "GoalReached",
+                "type": "event"
+            },
+            {
+                "anonymous": false,
+                "inputs": [
+                    {
+                        "indexed": false,
+                        "internalType": "address",
+                        "name": "contributor",
+                        "type": "address"
+                    },
+                    {
+                        "indexed": false,
+                        "internalType": "uint256",
+                        "name": "amount",
+                        "type": "uint256"
+                    }
+                ],
+                "name": "Refunded",
+                "type": "event"
+            },
+            {
+                "inputs": [],
+                "name": "contribute",
+                "outputs": [],
+                "stateMutability": "payable",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "refund",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    {
+                        "internalType": "uint256",
+                        "name": "_goal",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "_durationInDays",
+                        "type": "uint256"
+                    }
+                ],
+                "stateMutability": "nonpayable",
+                "type": "constructor"
+            },
+            {
+                "inputs": [],
+                "name": "withdraw",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function"
+            },
+            {
+                "stateMutability": "payable",
+                "type": "receive"
+            },
+            {
+                "inputs": [],
+                "name": "checkBalance",
+                "outputs": [
+                    {
+                        "internalType": "uint256",
+                        "name": "",
+                        "type": "uint256"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    {
+                        "internalType": "address",
+                        "name": "",
+                        "type": "address"
+                    }
+                ],
+                "name": "contributions",
+                "outputs": [
+                    {
+                        "internalType": "uint256",
+                        "name": "",
+                        "type": "uint256"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "contributorCount",
+                "outputs": [
+                    {
+                        "internalType": "uint256",
+                        "name": "",
+                        "type": "uint256"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "deadline",
+                "outputs": [
+                    {
+                        "internalType": "uint256",
+                        "name": "",
+                        "type": "uint256"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "fundsClaimed",
+                "outputs": [
+                    {
+                        "internalType": "bool",
+                        "name": "",
+                        "type": "bool"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    {
+                        "internalType": "address",
+                        "name": "_contributor",
+                        "type": "address"
+                    }
+                ],
+                "name": "getContribution",
+                "outputs": [
+                    {
+                        "internalType": "uint256",
+                        "name": "",
+                        "type": "uint256"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "getDetails",
+                "outputs": [
+                    {
+                        "internalType": "uint256",
+                        "name": "_goal",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "_deadline",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "_totalRaised",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "_contributorCount",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "bool",
+                        "name": "_goalReached",
+                        "type": "bool"
+                    },
+                    {
+                        "internalType": "bool",
+                        "name": "_fundsClaimed",
+                        "type": "bool"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "goal",
+                "outputs": [
+                    {
+                        "internalType": "uint256",
+                        "name": "",
+                        "type": "uint256"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "goalReached",
+                "outputs": [
+                    {
+                        "internalType": "bool",
+                        "name": "",
+                        "type": "bool"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "MIN_CONTRIBUTION",
+                "outputs": [
+                    {
+                        "internalType": "uint256",
+                        "name": "",
+                        "type": "uint256"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "owner",
+                "outputs": [
+                    {
+                        "internalType": "address",
+                        "name": "",
+                        "type": "address"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "timeRemaining",
+                "outputs": [
+                    {
+                        "internalType": "uint256",
+                        "name": "",
+                        "type": "uint256"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "totalRaised",
+                "outputs": [
+                    {
+                        "internalType": "uint256",
+                        "name": "",
+                        "type": "uint256"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            }
+        ];
+
+        // Elements
+        const connectWalletBtn = document.getElementById('connect-wallet');
+        const walletStatus = document.getElementById('wallet-status');
+        const campaignContainer = document.getElementById('campaign-container');
+        const goalElement = document.getElementById('goal');
+        const raisedElement = document.getElementById('raised');
+        const timeRemainingElement = document.getElementById('time-remaining');
+        const contributorCountElement = document.getElementById('contributor-count');
+        const goalReachedElement = document.getElementById('goal-reached');
+        const yourContributionElement = document.getElementById('your-contribution');
+        const contributionAmountInput = document.getElementById('contribution-amount');
+        const contributeBtn = document.getElementById('contribute-btn');
+        const withdrawBtn = document.getElementById('withdraw-btn');
+        const refundBtn = document.getElementById('refund-btn');
+        const ownerStatus = document.getElementById('owner-status');
+        const statusMessage = document.getElementById('status-message');
+
+        // Global variables
+        let provider;
+        let signer;
+        let contract;
+        let userAddress;
+        let contractAddress = '0x0c390c4CeA31f8CA7d39641f53a7caE4B3deF8f5';
+        let isOwner = false;
+        let campaignEnded = false;
+        let goalReached = false;
+
+        // Initialize the app
+        async function init() {
+            connectWalletBtn.addEventListener('click', connectWallet);
+            contributeBtn.addEventListener('click', contribute);
+            withdrawBtn.addEventListener('click', withdraw);
+            refundBtn.addEventListener('click', requestRefund);
+
+            // Check if MetaMask is installed
+            if (typeof window.ethereum !== 'undefined') {
+                console.log('MetaMask is installed!');
+
+                // Handle account changes
+                window.ethereum.on('accountsChanged', function (accounts) {
+                    console.log('Account changed:', accounts[0]);
+                    connectWallet();
+                });
+
+                // Handle chain changes
+                window.ethereum.on('chainChanged', function (chainId) {
+                    console.log('Network changed:', chainId);
+                    window.location.reload();
+                });
+            } else {
+                walletStatus.textContent = 'MetaMask is not installed';
+                walletStatus.style.color = 'red';
+                connectWalletBtn.disabled = true;
+            }
+        }
+
+        // Connect to MetaMask
+        async function connectWallet() {
+            try {
+                // Connect to MetaMask
+                const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+                userAddress = accounts[0];
+
+                // Display connected address
+                walletStatus.textContent = `Connected: ${userAddress.substr(0, 6)}...${userAddress.substr(-4)}`;
+                walletStatus.style.color = 'green';
+
+                // Create provider and signer
+                provider = new ethers.providers.Web3Provider(window.ethereum);
+                signer = provider.getSigner();
+
+                // Create contract instance
+                if (contractAddress) {
+                    contract = new ethers.Contract(contractAddress, contractABI, signer);
+                    campaignContainer.classList.remove('hidden');
+                    await refreshCampaignDetails();
+                    await checkOwnership();
+                    await checkContribution();
+
+                    // Set interval to refresh time remaining
+                    setInterval(updateTimeRemaining, 60000); // Every minute
+                }
+
+                // Show success message
+                showStatus('Wallet connected successfully!', 'success');
+            } catch (error) {
+                console.error('Error connecting wallet:', error);
+                showStatus('Failed to connect wallet: ' + error.message, 'error');
+            }
+        }
+
+        // Set contract address (call this after deployment)
+        function setContractAddress(address) {
+            contractAddress = address;
+            if (signer) {
+                contract = new ethers.Contract(contractAddress, contractABI, signer);
+                campaignContainer.classList.remove('hidden');
+                refreshCampaignDetails();
+                checkOwnership();
+                checkContribution();
+            }
+        }
+
+        // Refresh campaign details
+        async function refreshCampaignDetails() {
+            try {
+                // Get campaign details
+                const details = await contract.getDetails();
+                const goal = ethers.utils.formatEther(details[0]);
+                const deadline = new Date(details[1] * 1000);
+                const raised = ethers.utils.formatEther(details[2]);
+                const contributorCount = details[3].toString();
+                goalReached = details[4];
+                const fundsClaimed = details[5];
+
+                // Update UI
+                goalElement.textContent = `${goal} ETH`;
+                raisedElement.textContent = `${raised} ETH`;
+                contributorCountElement.textContent = contributorCount;
+                goalReachedElement.textContent = goalReached ? 'Yes' : 'No';
+
+                // Check if campaign has ended
+                const now = new Date();
+                campaignEnded = now > deadline;
+
+                // Update time remaining
+                updateTimeRemaining();
+
+                // Enable/disable buttons based on campaign status
+                if (isOwner && goalReached && !fundsClaimed) {
+                    withdrawBtn.disabled = false;
+                }
+
+                if (!isOwner && campaignEnded && !goalReached) {
+                    refundBtn.disabled = false;
+                }
+            } catch (error) {
+                console.error('Error refreshing campaign details:', error);
+                showStatus('Error loading campaign details', 'error');
+            }
+        }
+
+        // Update time remaining
+        async function updateTimeRemaining() {
+            try {
+                const timeRemaining = await contract.timeRemaining();
+                const days = Math.floor(timeRemaining / 86400);
+                const hours = Math.floor((timeRemaining % 86400) / 3600);
+
+                if (timeRemaining.toString() === '0') {
+                    timeRemainingElement.textContent = 'Campaign ended';
+                    campaignEnded = true;
+
+                    // Check if refund is available
+                    if (!isOwner && !goalReached) {
+                        const contribution = await contract.getContribution(userAddress);
+                        if (contribution.gt(0)) {
+                            refundBtn.disabled = false;
+                        }
+                    }
+                } else {
+                    timeRemainingElement.textContent = `${days} days, ${hours} hours`;
+                }
+            } catch (error) {
+                console.error('Error updating time remaining:', error);
+            }
+        }
+
+        // Check if current user is the owner
+        async function checkOwnership() {
+            try {
+                const owner = await contract.owner();
+                isOwner = owner.toLowerCase() === userAddress.toLowerCase();
+
+                if (isOwner) {
+                    ownerStatus.classList.remove('hidden');
+
+                    // Enable withdraw button if goal is reached
+                    const details = await contract.getDetails();
+                    if (details[4] && !details[5]) {
+                        withdrawBtn.disabled = false;
+                    }
+                }
+            } catch (error) {
+                console.error('Error checking ownership:', error);
+            }
+        }
+
+        // Check user's contribution
+        async function checkContribution() {
+            try {
+                const contribution = await contract.getContribution(userAddress);
+                yourContributionElement.textContent = `${ethers.utils.formatEther(contribution)} ETH`;
+            } catch (error) {
+                console.error('Error checking contribution:', error);
+            }
+        }
+
+        // Contribute function
+        async function contribute() {
+            try {
+                // Get amount from input
+                const amount = contributionAmountInput.value;
+                if (!amount || parseFloat(amount) < 0.01) {
+                    showStatus('Minimum contribution is 0.01 ETH', 'error');
+                    return;
+                }
+
+                // Convert amount to wei
+                const amountWei = ethers.utils.parseEther(amount);
+
+                // Send transaction
+                contributeBtn.disabled = true;
+                contributeBtn.innerHTML = '<span class="loading"></span> Processing...';
+
+                const tx = await contract.contribute({ value: amountWei });
+                showStatus('Transaction submitted. Waiting for confirmation...', 'success');
+
+                // Wait for transaction to be mined
+                await tx.wait();
+
+                // Refresh campaign details
+                await refreshCampaignDetails();
+                await checkContribution();
+
+                // Reset input and button
+                contributionAmountInput.value = '';
+                contributeBtn.disabled = false;
+                contributeBtn.textContent = 'Contribute';
+
+                showStatus('Contribution successful!', 'success');
+            } catch (error) {
+                console.error('Error contributing:', error);
+                contributeBtn.disabled = false;
+                contributeBtn.textContent = 'Contribute';
+                showStatus('Error contributing: ' + error.message, 'error');
+            }
+        }
+
+        // Withdraw function (owner only)
+        async function withdraw() {
+            try {
+                withdrawBtn.disabled = true;
+                withdrawBtn.innerHTML = '<span class="loading"></span> Processing...';
+
+                const tx = await contract.withdraw();
+                showStatus('Withdrawal initiated. Waiting for confirmation...', 'success');
+
+                // Wait for transaction to be mined
+                await tx.wait();
+
+                // Refresh campaign details
+                await refreshCampaignDetails();
+
+                withdrawBtn.textContent = 'Withdraw Funds';
+                showStatus('Funds withdrawn successfully!', 'success');
+            } catch (error) {
+                console.error('Error withdrawing:', error);
+                withdrawBtn.disabled = false;
+                withdrawBtn.textContent = 'Withdraw Funds';
+                showStatus('Error withdrawing: ' + error.message, 'error');
+            }
+        }
+
+        // Request refund function
+        async function requestRefund() {
+            try {
+                refundBtn.disabled = true;
+                refundBtn.innerHTML = '<span class="loading"></span> Processing...';
+
+                const tx = await contract.refund();
+                showStatus('Refund requested. Waiting for confirmation...', 'success');
+
+                // Wait for transaction to be mined
+                await tx.wait();
+
+                // Refresh contribution
+                await checkContribution();
+
+                refundBtn.textContent = 'Request Refund';
+                refundBtn.disabled = true;
+                showStatus('Refund processed successfully!', 'success');
+            } catch (error) {
+                console.error('Error requesting refund:', error);
+                refundBtn.disabled = false;
+                refundBtn.textContent = 'Request Refund';
+                showStatus('Error requesting refund: ' + error.message, 'error');
+            }
+        }
+
+        // Show status message
+        function showStatus(message, type) {
+            statusMessage.textContent = message;
+            statusMessage.className = `status ${type}`;
+            statusMessage.classList.remove('hidden');
+
+            // Hide after 5 seconds
+            setTimeout(() => {
+                statusMessage.classList.add('hidden');
+            }, 5000);
+        }
+
+        // Initialize app when DOM is loaded
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+
+</html>
