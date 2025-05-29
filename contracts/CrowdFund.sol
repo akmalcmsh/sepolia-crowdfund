@@ -57,13 +57,13 @@ contract CrowdFund {
      * @param _goal Funding goal in wei
      * @param _durationInDays Duration of the campaign in days
      */
-    constructor(uint256 _goal, uint256 _durationInDays) {
+    constructor(uint256 _goal, uint256 _durationInMinutes) {
         require(_goal > 0, "Goal must be greater than 0");
-        require(_durationInDays > 0, "Duration must be greater than 0");
+        require(_durationInMinutes > 0, "Duration must be greater than 0");
         
         owner = msg.sender;
         goal = _goal;
-        deadline = block.timestamp + (_durationInDays * 1 days);
+        deadline = block.timestamp + (_durationInMinutes * 1 minutes);
         totalRaised = 0;
         contributorCount = 0;
         goalReached = false;

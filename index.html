@@ -199,6 +199,22 @@
         // Contract ABI (will be replaced with actual ABI after compilation)
         const contractABI = [
             {
+                "inputs": [
+                    {
+                        "internalType": "uint256",
+                        "name": "_goal",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "_durationInDays",
+                        "type": "uint256"
+                    }
+                ],
+                "stateMutability": "nonpayable",
+                "type": "constructor"
+            },
+            {
                 "anonymous": false,
                 "inputs": [
                     {
@@ -251,44 +267,16 @@
             },
             {
                 "inputs": [],
-                "name": "contribute",
-                "outputs": [],
-                "stateMutability": "payable",
-                "type": "function"
-            },
-            {
-                "inputs": [],
-                "name": "refund",
-                "outputs": [],
-                "stateMutability": "nonpayable",
-                "type": "function"
-            },
-            {
-                "inputs": [
+                "name": "MIN_CONTRIBUTION",
+                "outputs": [
                     {
                         "internalType": "uint256",
-                        "name": "_goal",
-                        "type": "uint256"
-                    },
-                    {
-                        "internalType": "uint256",
-                        "name": "_durationInDays",
+                        "name": "",
                         "type": "uint256"
                     }
                 ],
-                "stateMutability": "nonpayable",
-                "type": "constructor"
-            },
-            {
-                "inputs": [],
-                "name": "withdraw",
-                "outputs": [],
-                "stateMutability": "nonpayable",
+                "stateMutability": "view",
                 "type": "function"
-            },
-            {
-                "stateMutability": "payable",
-                "type": "receive"
             },
             {
                 "inputs": [],
@@ -301,6 +289,13 @@
                     }
                 ],
                 "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "contribute",
+                "outputs": [],
+                "stateMutability": "payable",
                 "type": "function"
             },
             {
@@ -446,19 +441,6 @@
             },
             {
                 "inputs": [],
-                "name": "MIN_CONTRIBUTION",
-                "outputs": [
-                    {
-                        "internalType": "uint256",
-                        "name": "",
-                        "type": "uint256"
-                    }
-                ],
-                "stateMutability": "view",
-                "type": "function"
-            },
-            {
-                "inputs": [],
                 "name": "owner",
                 "outputs": [
                     {
@@ -468,6 +450,13 @@
                     }
                 ],
                 "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "refund",
+                "outputs": [],
+                "stateMutability": "nonpayable",
                 "type": "function"
             },
             {
@@ -495,9 +484,19 @@
                 ],
                 "stateMutability": "view",
                 "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "withdraw",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function"
+            },
+            {
+                "stateMutability": "payable",
+                "type": "receive"
             }
-        ];
-
+        ]
         // Elements
         const connectWalletBtn = document.getElementById('connect-wallet');
         const walletStatus = document.getElementById('wallet-status');
@@ -520,7 +519,7 @@
         let signer;
         let contract;
         let userAddress;
-        let contractAddress = '0x0c390c4CeA31f8CA7d39641f53a7caE4B3deF8f5';
+        let contractAddress = '0x8c4ABBF9906D1e3E9008B077EFEFE1887c8F7082';
         let isOwner = false;
         let campaignEnded = false;
         let goalReached = false;
